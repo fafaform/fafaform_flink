@@ -4,5 +4,5 @@ public class CountWithTimestamp {
     public String key;
     public long count;
     public long firstModified;
-    public long txn_amt;
+    public double txn_amt;
 }

@@ -11,7 +11,7 @@ import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2<String, Long>, Tuple3<String, Long, Long>> {
+public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2<String, Double>, Tuple3<String, Double, Long>> {
     /**
      * The state that is maintained by this process function
      */
@@ -26,7 +26,7 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2
     }
 
     @Override
-    public void processElement(Tuple2<String, Long> value, Context ctx, Collector<Tuple3<String, Long, Long>> out) throws Exception {
+    public void processElement(Tuple2<String, Double> value, Context ctx, Collector<Tuple3<String, Double, Long>> out) throws Exception {
 
         // retrieve the current count
         CountWithTimestamp current = state.value();
@@ -55,14 +55,14 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2
     }
 
     @Override
-    public void onTimer(long timestamp, OnTimerContext ctx, Collector<Tuple3<String, Long, Long>> out) throws Exception {
+    public void onTimer(long timestamp, OnTimerContext ctx, Collector<Tuple3<String, Double, Long>> out) throws Exception {
 
         // get the state for the key that scheduled the timer
         CountWithTimestamp result = state.value();
 
         LOG.info("==================== TIMEOUT: " + result.key);
         // emit the state on timeout
-        out.collect(new Tuple3<String, Long, Long>(result.key, result.txn_amt, result.count));
+        out.collect(new Tuple3<String, Double, Long>(result.key, result.txn_amt, result.count));
         state.clear();
     }
 }
