@@ -26,14 +26,15 @@ public class ReadFromKafka {
 
     public static String CARD_NUMBER = "CARD_NUMBER";
     public static String TXN_AMT = "TXN_AMT";
+    public static String TIMESTAMP = "TIMESTAMP";
     //// VARIABLES
-    public static String KAFKA_CONSUMER_TOPIC = "mq-sample100";
-//    public static String KAFKA_CONSUMER_TOPIC = "flink-from-kafka";
+//    public static String KAFKA_CONSUMER_TOPIC = "mq-sample100";
+    public static String KAFKA_CONSUMER_TOPIC = "flink-from-kafka";
     public static String KAFKA_PRODUCER_TOPIC = "flink-to-kafka";
     //// TEST IN CLUSTER
-    public static String BOOTSTRAP_SERVER = "poc01.kbtg:9092,poc02.kbtg:9092,poc03.kbtg:9092";
+//    public static String BOOTSTRAP_SERVER = "poc01.kbtg:9092,poc02.kbtg:9092,poc03.kbtg:9092";
     //// TEST IN MY LOCAL
-//    public static String BOOTSTRAP_SERVER = "localhost:9092";
+    public static String BOOTSTRAP_SERVER = "localhost:9092";
 
     public static Logger LOG = LoggerFactory.getLogger(ReadFromKafka.class);
 
@@ -51,39 +52,39 @@ public class ReadFromKafka {
 
         ////////////////////////////////////////////////////////////////
         //// RECEIVE JSON
-//        FlinkKafkaConsumer<ObjectNode> JsonSource = new FlinkKafkaConsumer(KAFKA_CONSUMER_TOPIC, new JSONKeyValueDeserializationSchema(false), properties);
-//        DataStream<Tuple2<String,Double>> messageStream = env.addSource(JsonSource).flatMap(new FlatMapFunction<ObjectNode, Tuple2<String,Double>>() {
-//            @Override
-//            public void flatMap(ObjectNode s, Collector<Tuple2<String,Double>> collector) throws Exception {
-//                collector.collect(new Tuple2<String, Double>(s.get("value").get(CARD_NUMBER).asText(),s.get("value").get(TXN_AMT).asDouble()));
-//            }
-//        });
+        FlinkKafkaConsumer<ObjectNode> JsonSource = new FlinkKafkaConsumer(KAFKA_CONSUMER_TOPIC, new JSONKeyValueDeserializationSchema(false), properties);
+        DataStream<Tuple3<String,Double,Long>> messageStream = env.addSource(JsonSource).flatMap(new FlatMapFunction<ObjectNode, Tuple3<String,Double,Long>>() {
+            @Override
+            public void flatMap(ObjectNode s, Collector<Tuple3<String, Double, Long>> collector) throws Exception {
+                collector.collect(new Tuple3<String, Double, Long>(s.get("value").get(CARD_NUMBER).asText(),s.get("value").get(TXN_AMT).asDouble(),s.get("value").get(TIMESTAMP).asLong()));
+            }
+        });
 
         ////////////////////////////////////////////////////////////////
         //// RECEIVE RAW
-        FlinkKafkaConsumer<byte[]> kafkaSource = new FlinkKafkaConsumer(KAFKA_CONSUMER_TOPIC, new AbstractDeserializationSchema<byte[]>() {
-            @Override
-            public byte[] deserialize(byte[] bytes) throws IOException {
-                return bytes;
-            }
-        }, properties);
-
-        // CONVERTING PROCESS
-        DataStream<Tuple2<String, Double>> messageStream = env.addSource(kafkaSource).process(new ProcessFunction<byte[], Tuple2<String, Double>>() {
-            @Override
-            public void processElement(byte[] s, Context context, Collector<Tuple2<String, Double>> collector) throws Exception {
-
-                TransactionObject transactionObject = new TransactionObject();
-                transactionObject.setTXN_ID(Arrays.copyOfRange(s, 0, 9));
-                transactionObject.setTIMESTAMP(Arrays.copyOfRange(s, 35, 45));
-                transactionObject.setCARD_TYPE(Arrays.copyOfRange(s, 25, 26));
-                transactionObject.setCARD_STATUS(Arrays.copyOfRange(s, 26, 27));
-                transactionObject.setTXN_AMT(Arrays.copyOfRange(s, 27, 35));
-                transactionObject.setCARD_NUMBER(Arrays.copyOfRange(s, 9, 25));
-
-                collector.collect(new Tuple2<String, Double>(transactionObject.getCARD_NUMBER(), transactionObject.getTXN_AMT()));
-            }
-        });
+//        FlinkKafkaConsumer<byte[]> kafkaSource = new FlinkKafkaConsumer(KAFKA_CONSUMER_TOPIC, new AbstractDeserializationSchema<byte[]>() {
+//            @Override
+//            public byte[] deserialize(byte[] bytes) throws IOException {
+//                return bytes;
+//            }
+//        }, properties);
+//
+//        // CONVERTING PROCESS
+//        DataStream<Tuple3<String, Double, Long>> messageStream = env.addSource(kafkaSource).process(new ProcessFunction<byte[], Tuple3<String, Double, Long>>() {
+//            @Override
+//            public void processElement(byte[] s, Context context, Collector<Tuple3<String, Double, Long>> collector) throws Exception {
+//
+//                TransactionObject transactionObject = new TransactionObject();
+//                transactionObject.setTXN_ID(Arrays.copyOfRange(s, 0, 9));
+//                transactionObject.setTIMESTAMP(Arrays.copyOfRange(s, 35, 45));
+//                transactionObject.setCARD_TYPE(Arrays.copyOfRange(s, 25, 26));
+//                transactionObject.setCARD_STATUS(Arrays.copyOfRange(s, 26, 27));
+//                transactionObject.setTXN_AMT(Arrays.copyOfRange(s, 27, 35));
+//                transactionObject.setCARD_NUMBER(Arrays.copyOfRange(s, 9, 25));
+//
+//                collector.collect(new Tuple3<String, Double, Long>(transactionObject.getCARD_NUMBER(), transactionObject.getTXN_AMT(), transactionObject.getTIMESTAMP()));
+//            }
+//        });
         ////////////////////////////////////////////////////////////////
 
         //// PRODUCT KAFKA

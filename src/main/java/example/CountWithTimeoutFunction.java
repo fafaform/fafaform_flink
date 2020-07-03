@@ -11,7 +11,7 @@ import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2<String, Double>, Tuple3<String, Double, Long>> {
+public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple3<String, Double, Long>, Tuple3<String, Double, Long>> {
     /**
      * The state that is maintained by this process function
      */
@@ -26,7 +26,7 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2
     }
 
     @Override
-    public void processElement(Tuple2<String, Double> value, Context ctx, Collector<Tuple3<String, Double, Long>> out) throws Exception {
+    public void processElement(Tuple3<String, Double, Long> value, Context ctx, Collector<Tuple3<String, Double, Long>> out) throws Exception {
 
         // retrieve the current count
         CountWithTimestamp current = state.value();
@@ -38,8 +38,11 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple2
             LOG.info("==================== FINISHED NEW CURRENT ======================");
             // set the state's timestamp to the record's assigned event time timestamp
             current.firstModified = ctx.timestamp();
+            ////////////////// TIMER SETTING
             // schedule the next timer 60 seconds from the current processing time
-            ctx.timerService().registerProcessingTimeTimer(ctx.timerService().currentProcessingTime() + 60000);
+//            ctx.timerService().registerProcessingTimeTimer(ctx.timerService().currentProcessingTime() + 60000);
+            // schedule the next timer 60 seconds from TIMESTAMP
+            ctx.timerService().registerProcessingTimeTimer(value.f2 + 60000);
         }
 
         // update the state's count
