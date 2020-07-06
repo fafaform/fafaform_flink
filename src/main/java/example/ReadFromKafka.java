@@ -4,6 +4,7 @@ import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.tuple.Tuple4;
 import org.apache.flink.api.java.tuple.Tuple6;
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
@@ -32,9 +33,9 @@ public class ReadFromKafka {
     public static String KAFKA_CONSUMER_TOPIC = "flink-from-kafka";
     public static String KAFKA_PRODUCER_TOPIC = "flink-to-kafka";
     //// TEST IN CLUSTER
-//    public static String BOOTSTRAP_SERVER = "poc01.kbtg:9092,poc02.kbtg:9092,poc03.kbtg:9092";
+    public static String BOOTSTRAP_SERVER = "poc01.kbtg:9092,poc02.kbtg:9092,poc03.kbtg:9092";
     //// TEST IN MY LOCAL
-    public static String BOOTSTRAP_SERVER = "localhost:9092";
+//    public static String BOOTSTRAP_SERVER = "localhost:9092";
 
     public static Logger LOG = LoggerFactory.getLogger(ReadFromKafka.class);
 
@@ -90,13 +91,20 @@ public class ReadFromKafka {
         //// PRODUCT KAFKA
         FlinkKafkaProducer<String> myProducer = new FlinkKafkaProducer(KAFKA_PRODUCER_TOPIC, new ProducerStringSerializationSchema(KAFKA_PRODUCER_TOPIC), properties, FlinkKafkaProducer.Semantic.EXACTLY_ONCE);
 
-        DataStream<Tuple3<String, Double, Long>> accessCounts = messageStream
-                .keyBy(0).process(new CountWithTimeoutFunction());
+        DataStream<Tuple4<String, Double, Long, String>> accessKeys = messageStream
+                .keyBy(0).process(new KeyMappingFunction());
 
-        DataStreamSink<String> sendingToKafka = accessCounts.process(new ProcessFunction<Tuple3<String, Double, Long>, String>() {
+        DataStream<Tuple4<String, Double, Long, String>> accessCounts = accessKeys
+                .keyBy(0, 3).process(new CountWithTimeoutFunction());
+
+        DataStreamSink<String> sendingToKafka = accessCounts.process(new ProcessFunction<Tuple4<String, Double, Long, String>, String>() {
             @Override
-            public void processElement(Tuple3<String, Double, Long> stringLongLongTuple3, Context context, Collector<String> collector) throws Exception {
-                collector.collect("{\"CARD_NUMBER\":\"" + stringLongLongTuple3.f0 + "\",\"TOTAL_AMOUNT\":" + stringLongLongTuple3.f1 + ",\"COUNT\":" + stringLongLongTuple3.f2 + "}");
+            public void processElement(Tuple4<String, Double, Long, String> stringLongLongTuple3, Context context, Collector<String> collector) throws Exception {
+                collector.collect("{\"CARD_NUMBER\":\"" + stringLongLongTuple3.f0 + "\""
+                        +",\"TOTAL_AMOUNT\":" + stringLongLongTuple3.f1
+                        + ",\"COUNT\":" + stringLongLongTuple3.f2
+                        + ",\"START_END\":\"" + stringLongLongTuple3.f3 + "\""
+                        +"}");
             }
         }).addSink(myProducer);
 
