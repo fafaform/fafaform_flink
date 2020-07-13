@@ -12,7 +12,7 @@ import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4<String, Double, Long, String>, Tuple4<String, Double, Long, String>> {
+public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4<String, Double, Long, Long>, Tuple4<String, Double, Long, String>> {
     /**
      * The state that is maintained by this process function
      */
@@ -27,19 +27,20 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
     }
 
     @Override
-    public void processElement(Tuple4<String, Double, Long, String> value, Context ctx, Collector<Tuple4<String, Double, Long, String>> out) throws Exception {
+    public void processElement(Tuple4<String, Double, Long, Long> value, Context ctx, Collector<Tuple4<String, Double, Long, String>> out) throws Exception {
 
         // retrieve the current count
         CountWithTimestamp current = state.value();
         if (current == null) {
             current = new CountWithTimestamp();
             current.key = value.f0;
-            current.key_time = value.f3;
+//            current.key_time = value.f3;
 //            LOG.info("==================== NEW CURRENT ======================");
 //            LOG.info("KEY:" + current.key);
 //            LOG.info("==================== FINISHED NEW CURRENT ======================");
             // set the state's timestamp to the record's assigned event time timestamp
-            current.firstModified = ctx.timestamp();
+            current.firstModified = value.f2;
+//            current.firstModified = ctx.timestamp();
             ////////////////// TIMER SETTING
             // schedule the next timer 60 seconds from the current processing time
             ctx.timerService().registerProcessingTimeTimer(ctx.timerService().currentProcessingTime() + 60000);
@@ -67,7 +68,7 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
 
 //        LOG.info("==================== TIMEOUT: " + result.key);
         // emit the state on timeout
-        out.collect(new Tuple4<String, Double, Long, String>(result.key, result.txn_amt, result.count, result.key_time));
+        out.collect(new Tuple4<String, Double, Long, String>(result.key, result.txn_amt, result.count, result.firstModified+"_"+(result.firstModified+60000)));
         state.clear();
     }
 }

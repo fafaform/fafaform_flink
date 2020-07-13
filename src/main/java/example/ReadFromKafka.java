@@ -1,5 +1,6 @@
 package example;
 
+import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.serialization.AbstractDeserializationSchema;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -34,10 +35,10 @@ public class ReadFromKafka {
 //    public static String KAFKA_CONSUMER_TOPIC = "flink-from-kafka";
 //    public static String KAFKA_PRODUCER_TOPIC = "flink-to-kafka";
     //// TEST IN CLUSTER
-    public static String BOOTSTRAP_SERVER = "172.30.74.84:9092,172.30.74.85:9092,172.30.74.86:9092";
+//    public static String BOOTSTRAP_SERVER = "172.30.74.84:9092,172.30.74.85:9092,172.30.74.86:9092";
 //    public static String BOOTSTRAP_SERVER = "poc01.kbtg:9092,poc02.kbtg:9092,poc03.kbtg:9092";
     //// TEST IN MY LOCAL
-//    public static String BOOTSTRAP_SERVER = "localhost:9092";
+    public static String BOOTSTRAP_SERVER = "localhost:9092";
 
     public static Logger LOG = LoggerFactory.getLogger(ReadFromKafka.class);
 
@@ -59,7 +60,10 @@ public class ReadFromKafka {
         DataStream<Tuple3<String,Double,Long>> messageStream = env.addSource(JsonSource).flatMap(new FlatMapFunction<ObjectNode, Tuple3<String,Double,Long>>() {
             @Override
             public void flatMap(ObjectNode s, Collector<Tuple3<String, Double, Long>> collector) throws Exception {
-                collector.collect(new Tuple3<String, Double, Long>(s.get("value").get(CARD_NUMBER).asText(),s.get("value").get(TXN_AMT).asDouble(),s.get("value").get(TIMESTAMP).asLong()));
+                collector.collect(new Tuple3<String, Double, Long>(
+                        s.get("value").get(CARD_NUMBER).asText(),
+                        s.get("value").get(TXN_AMT).asDouble(),
+                        s.get("value").get(TIMESTAMP).asLong()));
             }
         });
 
@@ -93,11 +97,24 @@ public class ReadFromKafka {
         //// PRODUCT KAFKA
         FlinkKafkaProducer<String> myProducer = new FlinkKafkaProducer(KAFKA_PRODUCER_TOPIC, new ProducerStringSerializationSchema(KAFKA_PRODUCER_TOPIC), properties, FlinkKafkaProducer.Semantic.EXACTLY_ONCE);
 
-        DataStream<Tuple4<String, Double, Long, String>> accessKeys = messageStream
-                .keyBy(0).process(new KeyMappingFunction());
+//        DataStream<Tuple4<String, Double, Long, String>> accessKeys = messageStream
+//                .keyBy(0).process(new KeyMappingFunction());
 
-        DataStream<Tuple4<String, Double, Long, String>> accessCounts = accessKeys
-                .keyBy(0, 3).process(new CountWithTimeoutFunction());
+        DataStream<Tuple4<String, Double, Long, String>> accessCounts = messageStream
+                .process(new ProcessFunction<Tuple3<String, Double, Long>, Tuple4<String, Double, Long, Long>>() {
+                    @Override
+                    public void processElement(Tuple3<String, Double, Long> input, Context context, Collector<Tuple4<String, Double, Long, Long>> collector) throws Exception {
+                        collector.collect(new Tuple4<String, Double, Long, Long>(
+                                input.f0, input.f1, input.f2, context.timestamp()));
+                    }
+                })
+                .filter(new FilterFunction<Tuple4<String, Double, Long, Long>>() {
+                    @Override
+                    public boolean filter(Tuple4<String, Double, Long, Long> transactionData) throws Exception {
+                        return (transactionData.f2 > (transactionData.f3-60000));
+                    }
+                })
+                .keyBy(0).process(new CountWithTimeoutFunction());
 
         DataStreamSink<String> sendingToKafka = accessCounts.process(new ProcessFunction<Tuple4<String, Double, Long, String>, String>() {
             @Override
@@ -105,11 +122,11 @@ public class ReadFromKafka {
                 collector.collect("{\"CARD_NUMBER\":\"" + stringLongLongTuple3.f0 + "\""
                         +",\"TOTAL_AMOUNT\":" + stringLongLongTuple3.f1
                         + ",\"COUNT\":" + stringLongLongTuple3.f2
-                        + ",\"START_END\":\"" + stringLongLongTuple3.f3 + "\""
+                        + ",\"WINDOWED_TIME\":\"" + stringLongLongTuple3.f3 + "\""
                         +"}");
             }
         }).addSink(myProducer);
 
-        env.execute("Read from kafka");
+        env.execute("Transaction Count and Summary");
     }
 }
