@@ -28,7 +28,7 @@ public class ReadFromKafka {
 
     public static String CARD_NUMBER = "CARD_NUMBER";
     public static String TXN_AMT = "TXN_AMT";
-    public static String TIMESTAMP = "TIMESTAMP";
+    public static String TIMESTAMP = "TIME_STAMP";
     //// VARIABLES
     public static String KAFKA_CONSUMER_TOPIC = "input";
     public static String KAFKA_PRODUCER_TOPIC = "credit_card_stats";
@@ -127,6 +127,6 @@ public class ReadFromKafka {
             }
         }).addSink(myProducer);
 
-        env.execute("Transaction Count and Summary");
+        env.execute("Flink Four One");
     }
 }

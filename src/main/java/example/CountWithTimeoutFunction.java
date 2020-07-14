@@ -47,12 +47,13 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
             // schedule the next timer 60 seconds from TIMESTAMP
 //            ctx.timerService().registerProcessingTimeTimer(value.f2 + 60000);
         }
+        if(value.f2 >= current.firstModified) {
+            // update the state's count
+            current.count++;
 
-        // update the state's count
-        current.count++;
-
-        // update the state's count
-        current.txn_amt += value.f1;
+            // update the state's count
+            current.txn_amt += value.f1;
+        }
 
 //        LOG.info("KEY:" + current.key + " COUNT:" + current.count + " TXN_AMT:" + current.txn_amt + " lastModified:" + current.firstModified);
 
