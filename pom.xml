@@ -8,6 +8,7 @@
     <artifactId>FlinkFourOne</artifactId>
     <version>1.0-SNAPSHOT</version>
     <build>
+        <finalName>FlinkFourOne</finalName>
         <plugins>
 <!--            <plugin>-->
 <!--                <groupId>org.apache.maven.plugins</groupId>-->

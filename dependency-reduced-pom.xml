@@ -5,6 +5,7 @@
   <artifactId>FlinkFourOne</artifactId>
   <version>1.0-SNAPSHOT</version>
   <build>
+    <finalName>FlinkFourOne</finalName>
     <plugins>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>

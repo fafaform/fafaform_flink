@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Properties;
 
@@ -32,13 +33,11 @@ public class ReadFromKafka {
     //// VARIABLES
     public static String KAFKA_CONSUMER_TOPIC = "input";
     public static String KAFKA_PRODUCER_TOPIC = "credit_card_stats";
-//    public static String KAFKA_CONSUMER_TOPIC = "flink-from-kafka";
-//    public static String KAFKA_PRODUCER_TOPIC = "flink-to-kafka";
     //// TEST IN CLUSTER
-//    public static String BOOTSTRAP_SERVER = "172.30.74.84:9092,172.30.74.85:9092,172.30.74.86:9092";
+    public static String BOOTSTRAP_SERVER = "172.30.74.84:9092,172.30.74.85:9092,172.30.74.86:9092";
 //    public static String BOOTSTRAP_SERVER = "poc01.kbtg:9092,poc02.kbtg:9092,poc03.kbtg:9092";
     //// TEST IN MY LOCAL
-    public static String BOOTSTRAP_SERVER = "localhost:9092";
+//    public static String BOOTSTRAP_SERVER = "localhost:9092";
 
     public static Logger LOG = LoggerFactory.getLogger(ReadFromKafka.class);
 
@@ -56,6 +55,8 @@ public class ReadFromKafka {
 
         ////////////////////////////////////////////////////////////////
         //// RECEIVE JSON
+//        final SimpleDateFormat receiveFormat = new SimpleDateFormat("yyyy-MM-dd-HH-mm-ss.SSS");
+
         FlinkKafkaConsumer<ObjectNode> JsonSource = new FlinkKafkaConsumer(KAFKA_CONSUMER_TOPIC, new JSONKeyValueDeserializationSchema(false), properties);
         DataStream<Tuple3<String,Double,Long>> messageStream = env.addSource(JsonSource).flatMap(new FlatMapFunction<ObjectNode, Tuple3<String,Double,Long>>() {
             @Override
@@ -63,7 +64,9 @@ public class ReadFromKafka {
                 collector.collect(new Tuple3<String, Double, Long>(
                         s.get("value").get(CARD_NUMBER).asText(),
                         s.get("value").get(TXN_AMT).asDouble(),
-                        s.get("value").get(TIMESTAMP).asLong()));
+//                        receiveFormat.parse(s.get("value").get(TIMESTAMP).asText()).getTime()
+                        s.get("value").get(TIMESTAMP).asLong()
+                ));
             }
         });
 
