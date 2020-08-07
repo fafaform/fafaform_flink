@@ -33,7 +33,10 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
     @Override
     public void processElement(Tuple4<String, Double, Long, Long> value, final Context ctx, Collector<Tuple4<String, Double, Long, String>> out) throws Exception {
 
-        if(ctx.timestamp() > ctx.timerService().currentWatermark() + (60000 * MINUTE) && ctx.timerService().currentWatermark() != 0){
+        // retrieve the current count
+        CountWithTimestamp current = state.value();
+
+        if(current != null && ctx.timestamp() > current.firstModified + (60000 * MINUTE)){
             onTimer(ctx.timestamp(), new OnTimerContext() {
                 @Override
                 public TimeDomain timeDomain() {
@@ -61,8 +64,7 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
                 }
             }, out);
         }
-        // retrieve the current count
-        CountWithTimestamp current = state.value();
+
         if (current == null) {
             current = new CountWithTimestamp();
             current.key = value.f0;
@@ -80,6 +82,7 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
             // schedule the next timer 60 seconds from TIMESTAMP
 //            ctx.timerService().registerProcessingTimeTimer(value.f2 + 60000);
         }
+
         if(value.f2 >= current.firstModified && value.f2 <= current.firstModified + (60000 * MINUTE)) {
             timeDiff.update(ctx.timerService().currentProcessingTime() - ctx.timestamp());
             // update the state's count
