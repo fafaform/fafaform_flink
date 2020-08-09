@@ -36,8 +36,9 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
         // retrieve the current count
         CountWithTimestamp current = state.value();
 
-        if(current != null && ctx.timestamp() > current.firstModified + (60000 * MINUTE)){
-            onTimer(ctx.timestamp(), new OnTimerContext() {
+        if(current != null && ctx.timestamp() >= (current.firstModified + (60000 * MINUTE))){
+            timeDiff.update(ctx.timerService().currentProcessingTime() - ctx.timestamp());
+            onTimer(ctx.timerService().currentProcessingTime(), new OnTimerContext() {
                 @Override
                 public TimeDomain timeDomain() {
                     return null;
@@ -65,6 +66,7 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
             }, out);
         }
 
+        current = state.value();
         if (current == null) {
             current = new CountWithTimestamp();
             current.key = value.f0;
@@ -77,13 +79,13 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
 //            current.firstModified = ctx.timestamp();
             ////////////////// TIMER SETTING
             // schedule the next timer 60 seconds from the current processing time
+//            LOG.info("PROCESSING: " + ctx.timerService().currentProcessingTime() + " , timestamp: " + ctx.timestamp());
             timeDiff.update(ctx.timerService().currentProcessingTime() - ctx.timestamp());
             ctx.timerService().registerProcessingTimeTimer(ctx.timerService().currentProcessingTime() + (60000 * MINUTE));
             // schedule the next timer 60 seconds from TIMESTAMP
 //            ctx.timerService().registerProcessingTimeTimer(value.f2 + 60000);
         }
-
-        if(value.f2 >= current.firstModified && value.f2 <= current.firstModified + (60000 * MINUTE)) {
+        if(value.f2 >= current.firstModified - 10000 && value.f2 <= current.firstModified + (60000 * MINUTE)) {
             timeDiff.update(ctx.timerService().currentProcessingTime() - ctx.timestamp());
             // update the state's count
             current.count++;
@@ -92,11 +94,9 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
             current.txn_amt += value.f1;
         }
 
-//        LOG.info("KEY:" + current.key + " COUNT:" + current.count + " TXN_AMT:" + current.txn_amt + " lastModified:" + current.firstModified);
-
         // write the state back
         state.update(current);
-        LOG.info("CURRENT TIMESTAMP: " + ctx.timestamp());
+//        LOG.info("CURRENT TIMESTAMP: " + ctx.timestamp());
     }
 
     @Override
@@ -107,12 +107,14 @@ public class CountWithTimeoutFunction extends KeyedProcessFunction<Tuple, Tuple4
         long timeDif = 0;
         try {
             timeDif = timeDiff.value();
+//            LOG.info("TIMEDIFF VALUE: " + timeDif);
         }catch (NullPointerException ne){
-            LOG.info("TIMEDIFF VALUE: " + timeDiff.value());
+//            LOG.info("TIMEDIFF VALUE: " + timeDiff.value());
         }
         if (result != null) {
+            LOG.info("TIMESTAMP: " + timestamp + ":" + timeDif + " RESULT: " + (timestamp - timeDif) + " : " + (result.firstModified + (60000 * MINUTE)));
             if ((timestamp - timeDif) >= (result.firstModified + (60000 * MINUTE)) || (timestamp - timeDif) > ctx.timerService().currentProcessingTime()) {
-//        LOG.info("==================== TIMEOUT: " + result.key);
+//                LOG.info("====================");
                 // emit the state on timeout
                 out.collect(new Tuple4<String, Double, Long, String>(result.key, result.txn_amt, result.count, result.firstModified + "_" + (result.firstModified + (60000 * MINUTE))));
                 state.clear();
